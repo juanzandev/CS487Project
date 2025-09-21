@@ -1,0 +1,38 @@
+=====================================================
+CANVAS GRADE WIDGET - QUICK SETUP INSTRUCTIONS
+=====================================================
+
+STEP 1: GET YOUR CANVAS API TOKEN
+1. Log into your school's Canvas website
+2. Click "Account" (top-left) → "Settings"
+3. Scroll down to "Approved Integrations"
+4. Click "+ New Access Token"
+5. Type "Grade Widget" for the purpose
+6. Click "Generate Token"
+7. COPY THE TOKEN - you won't see it again!
+
+STEP 2: SETUP CONFIG FILE
+1. Right-click "config.example.py" → "Open with Notepad"
+2. Replace the text inside with your school's info:
+
+   CANVAS_BASE_URL = "https://your-school.instructure.com"
+   API_TOKEN = "paste_your_copied_token_here"
+   THEME = "auto"
+
+3. Save as "config.py" (remove ".example" from the name)
+
+STEP 3: RUN THE APP
+1. Double-click "CanvasGradeWidget_Fixed.exe"
+2. If Windows asks, click "More info" → "Run anyway"
+3. Your grades should appear!
+
+TROUBLESHOOTING:
+- Make sure your Canvas URL is correct
+- Double-check your API token
+- File must be named "config.py" exactly
+
+SECURITY: Your login info stays on your computer only.
+
+For detailed help, see SETUP_GUIDE.md
+
+Enjoy! 🎓
