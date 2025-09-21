@@ -10,15 +10,25 @@ A beautiful, lightweight desktop widget that displays your Canvas LMS courses an
 
 ## ✨ Features
 
-### 📊 **Real-Time Grade Monitoring**
+### � **Student Profile Integration**
+
+- **Profile Picture Display**: Shows your Canvas profile picture in an elegant circular frame
+- **Student Name**: Displays your full name from Canvas profile
+- **Real-Time Loading**: Automatically fetches and updates profile information
+- **Graceful Fallbacks**: Professional default avatar when profile picture is unavailable
+
+### �📊 **Real-Time Grade Monitoring**
 
 - **Live Grade Updates**: Automatically fetches and displays current grades from Canvas LMS
 - **Multiple Grade Types**: Shows current scores, final grades, and letter grades
 - **Color-Coded Performance**: Visual grade indicators (A=Green, B=Orange, C=Red, F=Dark Red)
+- **Course Organization**: Clean, scrollable list of all your enrolled courses
 
-### 🎨 **Beautiful Theming System**
+### 🎨 **Enhanced UI & Theming System**
 
-- **4 Stunning Themes**: Auto (System), Light, Dark, and Nord themes
+- **4 Stunning Themes**: Auto (System), Light, Dark, and Nord themes with elegant gradients
+- **Gradient Backgrounds**: Beautiful gradient effects throughout the interface
+- **Polished Controls**: Redesigned settings, refresh, and close buttons with smooth hover effects
 - **Adaptive UI**: Automatically follows your system's dark/light mode preference
 - **Instant Theme Switching**: Change themes on-the-fly with immediate preview
 - **Consistent Design**: Carefully crafted color schemes for optimal readability
@@ -55,11 +65,12 @@ A beautiful, lightweight desktop widget that displays your Canvas LMS courses an
 
 This project uses the following high-quality libraries:
 
-| Library       | Version | Purpose                                                           |
-| ------------- | ------- | ----------------------------------------------------------------- |
-| **PySide6**   | 6.9.2   | Modern Qt6-based GUI framework for beautiful desktop applications |
-| **requests**  | ≥2.31.0 | HTTP library for Canvas API communication                         |
-| **shiboken6** | 6.9.2   | Python bindings generator (PySide6 dependency)                    |
+| Library         | Version | Purpose                                                           |
+| --------------- | ------- | ----------------------------------------------------------------- |
+| **PySide6**     | 6.9.2   | Modern Qt6-based GUI framework for beautiful desktop applications |
+| **requests**    | ≥2.31.0 | HTTP library for Canvas API communication                         |
+| **shiboken6**   | 6.9.2   | Python bindings generator (PySide6 dependency)                    |
+| **PyInstaller** | ≥6.0.0  | Creates standalone executables from Python applications           |
 
 ## 🚀 Quick Start
 

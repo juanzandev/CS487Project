@@ -11,8 +11,9 @@ import os
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                                QLabel, QPushButton, QScrollArea, QFrame, QDialog,
                                QLineEdit, QTextEdit, QMessageBox, QFormLayout, QComboBox)
-from PySide6.QtCore import Qt, QPoint, QTimer, QThread, Signal
-from PySide6.QtGui import QFont, QPalette
+from PySide6.QtCore import Qt, QPoint, QTimer, QThread, Signal, QUrl
+from PySide6.QtGui import QFont, QPalette, QPixmap, QPainter, QPen, QBrush
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 # Theme definitions
 THEMES = {
@@ -88,36 +89,67 @@ def get_system_theme():
 def load_theme_config():
     """Load theme configuration from config.py"""
     try:
+        # Read config.py directly from file system, not cached import
+        config_path = 'config.py'
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config_content = f.read()
+
+            # Parse the THEME value from the file
+            for line in config_content.split('\n'):
+                line = line.strip()
+                if line.startswith('THEME = '):
+                    # Extract the theme value
+                    theme_value = line.split('THEME = ')[1].strip()
+                    # Remove quotes if present
+                    theme_value = theme_value.strip('"\'')
+                    print(f"Loaded theme from config.py: {theme_value}")
+                    return theme_value
+
+        # Fallback: try import if file reading fails
         from config import THEME
+        print(f"Loaded theme from import fallback: {THEME}")
         return THEME
-    except ImportError:
+    except Exception as e:
+        print(f"Error loading theme config: {e}")
         return 'auto'
 
 
 def save_theme_config(theme):
     """Save theme configuration to config.py"""
     try:
+        config_path = 'config.py'
+        print(f"Saving theme '{theme}' to {os.path.abspath(config_path)}")
+
         # Read existing config
         config_content = ""
-        if os.path.exists('config.py'):
-            with open('config.py', 'r') as f:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
                 config_content = f.read()
+            print(
+                f"Read existing config content: {len(config_content)} characters")
 
         # Update or add theme setting
         if 'THEME = ' in config_content:
             lines = config_content.split('\n')
             for i, line in enumerate(lines):
                 if line.startswith('THEME = '):
+                    old_value = line
                     lines[i] = f'THEME = "{theme}"'
+                    print(f"Updated theme line: {old_value} -> {lines[i]}")
                     break
             config_content = '\n'.join(lines)
         else:
             config_content += f'\nTHEME = "{theme}"\n'
+            print(f"Added new theme line: THEME = \"{theme}\"")
 
-        with open('config.py', 'w') as f:
+        with open(config_path, 'w') as f:
             f.write(config_content)
+        print(
+            f"Successfully saved theme config to {os.path.abspath(config_path)}")
         return True
-    except Exception:
+    except Exception as e:
+        print(f"Error saving theme config: {e}")
         return False
 
 
@@ -137,28 +169,80 @@ def get_theme_styles(theme_name=None):
     return {
         'main_widget': f"""
             QWidget {{
-                background-color: {theme['bg_secondary']};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['bg_secondary']},
+                    stop:0.3 {theme['bg_primary']},
+                    stop:1 {theme['bg_secondary']});
                 color: {theme['text_primary']};
-                border: 2px solid {theme['border']};
-                border-radius: 8px;
+                border: 2px solid qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {theme['border']}, stop:0.5 {theme['border_light']}, stop:1 {theme['border']});
+                border-radius: 12px;
             }}
-            QPushButton {{
-                background-color: {theme['bg_primary']};
+            QPushButton:not(#settingsButton):not(#refreshButton):not(#closeButton) {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['bg_primary']},
+                    stop:1 {theme['bg_tertiary']});
                 color: {theme['text_primary']};
                 border: 1px solid {theme['border_light']};
-                border-radius: 3px;
-                padding: 5px;
+                border-radius: 6px;
+                padding: 6px 12px;
                 font-size: 10px;
+                font-weight: 500;
             }}
-            QPushButton:hover {{
-                background-color: {theme['bg_tertiary']};
+            QPushButton:not(#settingsButton):not(#refreshButton):not(#closeButton):hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['bg_tertiary']},
+                    stop:1 {theme['bg_primary']});
+                border: 1px solid {theme['border']};
             }}
-            QPushButton:pressed {{
-                background-color: {theme['border_light']};
+            QPushButton:not(#settingsButton):not(#refreshButton):not(#closeButton):pressed {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['border_light']},
+                    stop:1 {theme['bg_tertiary']});
+            }}
+            QPushButton#settingsButton, QPushButton#refreshButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.95),
+                    stop:1 rgba(245, 248, 252, 0.9));
+                border: 1px solid rgba(74, 144, 226, 0.3);
+                border-radius: 6px;
+                font-size: 13px;
+                color: #4A90E2;
+                font-weight: normal;
+                text-align: center;
+                padding: 0px;
+                margin: 0px;
+            }}
+            QPushButton#settingsButton:hover, QPushButton#refreshButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(74, 144, 226, 0.08),
+                    stop:1 rgba(74, 144, 226, 0.15));
+                border: 1px solid rgba(74, 144, 226, 0.6);
+                color: #2E5C8A;
+            }}
+            QPushButton#closeButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.95),
+                    stop:1 rgba(252, 245, 245, 0.9));
+                border: 1px solid rgba(211, 47, 47, 0.3);
+                border-radius: 6px;
+                font-size: 18px;
+                font-weight: normal;
+                color: #d32f2f;
+                text-align: center;
+                padding: 0px;
+                margin: 0px;
+            }}
+            QPushButton#closeButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(211, 47, 47, 0.08),
+                    stop:1 rgba(211, 47, 47, 0.15));
+                border: 1px solid rgba(211, 47, 47, 0.6);
+                color: #B71C1C;
             }}
             QScrollArea {{
                 border: none;
-                background-color: transparent;
+                background: transparent;
             }}
             QLabel {{
                 border: none;
@@ -167,16 +251,30 @@ def get_theme_styles(theme_name=None):
         """,
         'course_widget': f"""
             QFrame {{
-                background-color: {theme['bg_primary']};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['bg_primary']},
+                    stop:0.5 {theme['bg_secondary']},
+                    stop:1 {theme['bg_primary']});
                 color: {theme['text_primary']};
-                border: 1px solid {theme['border_light']};
-                border-radius: 5px;
-                margin: 2px;
-                padding: 5px;
+                border: 1px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {theme['border_light']}, 
+                    stop:0.5 {theme['border']}, 
+                    stop:1 {theme['border_light']});
+                border-radius: 8px;
+                margin: 3px;
+                padding: 8px;
+            }}
+            QFrame:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {theme['bg_secondary']},
+                    stop:0.5 {theme['bg_tertiary']},
+                    stop:1 {theme['bg_secondary']});
+                border: 1px solid {theme['border']};
             }}
             QLabel {{
                 border: none;
                 color: {theme['text_primary']};
+                font-weight: 500;
             }}
         """,
         'dialog': f"""
@@ -244,7 +342,18 @@ def get_theme_styles(theme_name=None):
                 selection-background-color: {theme['bg_tertiary']};
             }}
         """,
-        'title': f"color: {theme['text_accent']};",
+        'title': f"""
+            color: {theme['text_accent']};
+            font-size: 16px;
+            font-weight: bold;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 rgba(74, 144, 226, 0.1),
+                stop:0.5 rgba(255, 255, 255, 0.05),
+                stop:1 rgba(74, 144, 226, 0.1));
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(74, 144, 226, 0.2);
+        """,
         'close_button': f"""
             QPushButton {{
                 color: {theme['error']};
@@ -589,14 +698,56 @@ class SettingsDialog(QDialog):
 
     def on_theme_changed(self):
         """Handle theme change"""
-        selected_theme = self.theme_combo.currentData()
-        save_theme_config(selected_theme)
-        self.apply_theme()
-        # Notify parent to update theme if it exists
-        if self.parent():
-            self.parent().apply_theme()
-            # Also refresh the courses to apply new theme to course widgets
-            self.parent().display_courses()
+        try:
+            selected_theme = self.theme_combo.currentData()
+
+            # First save theme to config.py
+            if save_theme_config(selected_theme):
+                print(f"Theme saved to config.py: {selected_theme}")
+
+                # Apply theme to settings dialog
+                self.apply_theme()
+
+                # Notify parent to update theme if it exists
+                if self.parent():
+                    # Apply comprehensive theme change using a single shot timer to prevent crashes
+                    QTimer.singleShot(
+                        100, lambda: self.apply_comprehensive_theme_change(self.parent()))
+            else:
+                raise Exception("Failed to save theme to config.py")
+
+        except Exception as e:
+            print(f"Error changing theme: {e}")
+            QMessageBox.warning(self, "Theme Change Error",
+                                f"There was an error changing the theme: {str(e)}\nPlease check that config.py is writable.")
+
+    def apply_comprehensive_theme_change(self, main_widget):
+        """Apply comprehensive theme changes to main widget"""
+        try:
+            # Prevent simultaneous theme changes
+            if hasattr(main_widget, 'theme_applying') and main_widget.theme_applying:
+                print("Theme change already in progress, skipping...")
+                return
+
+            main_widget.theme_applying = True
+
+            # Apply theme to main widget
+            main_widget.apply_theme()
+
+            # Refresh courses with new theme
+            if hasattr(main_widget, 'display_courses'):
+                main_widget.display_courses()
+
+            # Update status
+            if hasattr(main_widget, 'status_label'):
+                main_widget.status_label.setText(
+                    f"Theme updated successfully! Last updated: {main_widget.get_current_time()}")
+
+        except Exception as e:
+            print(f"Error applying comprehensive theme change: {e}")
+        finally:
+            if hasattr(main_widget, 'theme_applying'):
+                main_widget.theme_applying = False
 
     def toggle_token_visibility(self):
         """Toggle token visibility"""
@@ -679,37 +830,85 @@ class SettingsDialog(QDialog):
             parent_widget = self.parent()
             self.accept()
 
-            # If theme changed, restart the application
-            if theme_changed and parent_widget:
-                QTimer.singleShot(
-                    100, lambda: self.restart_application(parent_widget))
-            elif parent_widget:
-                # Just refresh if no theme change
-                QTimer.singleShot(100, lambda: parent_widget.apply_theme())
-                QTimer.singleShot(200, lambda: parent_widget.display_courses())
+            # Apply theme changes immediately without restart
+            if parent_widget:
+                # Force immediate theme refresh
+                QTimer.singleShot(100, lambda: self.apply_all_theme_changes(
+                    parent_widget, theme_changed))
         else:
             QMessageBox.critical(
                 self, "Error", "Failed to save configuration!")
 
-    def restart_application(self, main_widget):
-        """Restart the application to apply theme changes"""
-        import subprocess
-        import sys
+    def apply_all_theme_changes(self, main_widget, theme_changed):
+        """Apply theme changes to all components without restart"""
+        # Prevent simultaneous theme changes that could cause crashes
+        if hasattr(main_widget, 'theme_applying') and main_widget.theme_applying:
+            print("Theme change already in progress, skipping...")
+            return
 
-        # Close the current application
-        main_widget.close()
+        try:
+            main_widget.theme_applying = True
+            print(f"Applying theme changes, theme_changed: {theme_changed}")
 
-        # Start a new instance
-        subprocess.Popen([sys.executable, "canvas_grade_widget.py"],
-                         cwd=os.getcwd())
+            # Step 1: Apply theme to main widget
+            main_widget.apply_theme()
 
-        # Exit current instance
-        QApplication.instance().quit()
+            # Step 2: Force refresh all existing course widgets
+            # Clear all existing course widgets first
+            if hasattr(main_widget, 'courses_layout') and main_widget.courses_layout:
+                for i in reversed(range(main_widget.courses_layout.count())):
+                    item = main_widget.courses_layout.itemAt(i)
+                    if item:
+                        child = item.widget()
+                        if child:
+                            child.setParent(None)
+                            child.deleteLater()
+
+                # Step 3: Recreate course widgets with new theme
+                if hasattr(main_widget, 'courses') and main_widget.courses:
+                    for course in main_widget.courses:
+                        course_widget = CourseWidget(course)
+                        main_widget.courses_layout.addWidget(course_widget)
+
+                # Add stretch to push courses to top
+                main_widget.courses_layout.addStretch()
+
+            # Step 4: Apply theme to all buttons and controls
+            # Refresh button
+            if hasattr(main_widget, 'refresh_button'):
+                styles = get_theme_styles()
+                main_widget.refresh_button.setStyleSheet(styles['main_widget'])
+
+            # Step 5: Update the status
+            if hasattr(main_widget, 'status_label'):
+                main_widget.status_label.setText(
+                    f"Theme updated successfully! Last updated: {main_widget.get_current_time()}")
+
+            # Step 6: Force widget update
+            main_widget.update()
+            main_widget.repaint()
+
+            print("Theme changes applied successfully")
+
+        except Exception as e:
+            print(f"Error applying theme: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback: show message that manual restart may be needed
+            QMessageBox.information(
+                None, "Theme Updated",
+                f"Theme has been saved but there was an error applying it: {str(e)}\nPlease restart the application to see the changes."
+            )
+        finally:
+            # Always reset the flag
+            if hasattr(main_widget, 'theme_applying'):
+                main_widget.theme_applying = False
 
 
 class CanvasAPIWorker(QThread):
     """Worker thread for Canvas API calls to prevent UI freezing"""
     courses_fetched = Signal(list)
+    profile_fetched = Signal(dict)
     error_occurred = Signal(str)
 
     def __init__(self, canvas_url, api_token):
@@ -722,6 +921,11 @@ class CanvasAPIWorker(QThread):
         try:
             if self._stop_requested:
                 return
+
+            # Fetch user profile information
+            profile = self.get_user_profile()
+            if profile and not self._stop_requested:
+                self.profile_fetched.emit(profile)
 
             courses = self.get_canvas_courses()
             if courses and not self._stop_requested:
@@ -792,6 +996,28 @@ class CanvasAPIWorker(QThread):
                     }
         except Exception:
             pass
+        return None
+
+    def get_user_profile(self):
+        """Fetches current user profile information"""
+        url = f"{self.canvas_url}/api/v1/users/self/profile"
+        headers = {
+            "Authorization": f"Bearer {self.api_token}",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                profile_data = response.json()
+                return {
+                    'name': profile_data.get('name', 'Student'),
+                    'short_name': profile_data.get('short_name', ''),
+                    'avatar_url': profile_data.get('avatar_url', ''),
+                    'id': profile_data.get('id', '')
+                }
+        except Exception as e:
+            print(f"Error fetching user profile: {e}")
         return None
 
 
@@ -909,6 +1135,175 @@ class CourseWidget(QFrame):
         return grade_label
 
 
+class ProfileWidget(QWidget):
+    """Widget to display student profile information"""
+
+    def __init__(self):
+        super().__init__()
+        self.profile_data = None
+        self.network_manager = QNetworkAccessManager()
+        self.network_manager.finished.connect(self.on_image_loaded)
+        self.initUI()
+
+    def initUI(self):
+        # Add elegant styling to the profile widget
+        self.setStyleSheet("""
+            ProfileWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.8),
+                    stop:1 rgba(240, 245, 251, 0.8));
+                border: 1px solid rgba(74, 144, 226, 0.3);
+                border-radius: 8px;
+                padding: 5px;
+            }
+        """)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(10)
+
+        # Profile picture (circular)
+        self.avatar_label = QLabel()
+        self.avatar_label.setFixedSize(40, 40)
+        # Elegant circular border with gradient effect
+        self.avatar_label.setStyleSheet("""
+            QLabel {
+                border: 2px solid qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #4A90E2, stop:0.5 #7BB3F0, stop:1 #4A90E2);
+                border-radius: 20px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #f8f9fa, stop:1 #e9ecef);
+            }
+        """)
+        self.set_default_avatar()
+        layout.addWidget(self.avatar_label)
+
+        # Student name
+        self.name_label = QLabel("Loading...")
+        self.name_label.setStyleSheet("""
+            QLabel {
+                font-weight: 600;
+                font-size: 13px;
+                color: #2c3e50;
+                background: transparent;
+                padding: 2px 8px;
+                border-radius: 4px;
+            }
+        """)
+        layout.addWidget(self.name_label)
+
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def set_default_avatar(self):
+        """Set a default avatar when no image is available"""
+        pixmap = QPixmap(40, 40)
+        pixmap.fill(Qt.lightGray)
+
+        # Draw a simple person icon
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QPen(Qt.darkGray, 2))
+        painter.setBrush(QBrush(Qt.white))
+
+        # Draw circle background
+        painter.drawEllipse(2, 2, 36, 36)
+
+        # Draw simple person icon
+        painter.setPen(QPen(Qt.darkGray, 3))
+        # Head
+        painter.drawEllipse(15, 10, 10, 10)
+        # Body
+        painter.drawEllipse(12, 22, 16, 12)
+
+        painter.end()
+
+        # Make it circular
+        circular_pixmap = self.make_circular(pixmap)
+        self.avatar_label.setPixmap(circular_pixmap)
+
+    def make_circular(self, pixmap):
+        """Convert a pixmap to circular shape"""
+        size = min(pixmap.width(), pixmap.height())
+        circular_pixmap = QPixmap(size, size)
+        circular_pixmap.fill(Qt.transparent)
+
+        painter = QPainter(circular_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Create circular clipping region
+        from PySide6.QtGui import QPainterPath
+        path = QPainterPath()
+        path.addEllipse(0, 0, size, size)
+        painter.setClipPath(path)
+
+        # Draw the original pixmap within the circular clipping region
+        painter.drawPixmap(0, 0, size, size, pixmap)
+        painter.end()
+
+        return circular_pixmap
+
+    def update_profile(self, profile_data):
+        """Update the profile widget with user data"""
+        self.profile_data = profile_data
+
+        # Update name
+        name = profile_data.get('name', 'Student')
+        self.name_label.setText(name)
+
+        # Load avatar if available
+        avatar_url = profile_data.get('avatar_url', '')
+        if avatar_url:
+            self.load_avatar(avatar_url)
+        else:
+            self.set_default_avatar()
+
+    def load_avatar(self, url):
+        """Load avatar image from URL"""
+        try:
+            request = QNetworkRequest(QUrl(url))
+            self.network_manager.get(request)
+        except Exception as e:
+            print(f"Error loading avatar: {e}")
+            self.set_default_avatar()
+
+    def on_image_loaded(self, reply):
+        """Handle loaded image data"""
+        try:
+            # Fix Qt6 API - use NetworkError enum
+            from PySide6.QtNetwork import QNetworkReply
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = reply.readAll()
+                pixmap = QPixmap()
+                if pixmap.loadFromData(data):
+                    # Scale and make circular with fixed masking
+                    scaled_pixmap = pixmap.scaled(
+                        40, 40, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                    circular_pixmap = self.make_circular(scaled_pixmap)
+                    self.avatar_label.setPixmap(circular_pixmap)
+                    self.avatar_label.setVisible(True)
+                    # Keep elegant border when image is loaded
+                    self.avatar_label.setStyleSheet("""
+                        QLabel {
+                            border: 2px solid qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 #4A90E2, stop:0.5 #7BB3F0, stop:1 #4A90E2);
+                            border-radius: 20px;
+                        }
+                    """)
+                else:
+                    self.set_default_avatar()
+            else:
+                self.set_default_avatar()
+                self.set_default_avatar()
+        except Exception as e:
+            print(f"Error processing avatar image: {e}")
+            import traceback
+            traceback.print_exc()
+            self.set_default_avatar()
+        finally:
+            reply.deleteLater()
+
+
 class CanvasGradeWidget(QWidget):
     """Main desktop widget for Canvas grades"""
 
@@ -918,6 +1313,9 @@ class CanvasGradeWidget(QWidget):
         self.courses = []
         self.canvas_url = None
         self.api_token = None
+        self.theme_applying = False  # Flag to prevent simultaneous theme changes
+        self.current_applied_theme = None  # Track currently applied theme
+        self.profile_widget = None  # Profile widget for user info
 
         # Load configuration or show setup
         if not self.load_configuration():
@@ -929,9 +1327,40 @@ class CanvasGradeWidget(QWidget):
         self.refresh_data()
 
     def apply_theme(self):
-        """Apply current theme to the widget"""
-        styles = get_theme_styles()
+        """Apply current theme to the widget and all its components"""
+        # Read theme from config.py directly
+        current_theme_from_config = load_theme_config()
+
+        # Only apply theme if it actually changed
+        if self.current_applied_theme == current_theme_from_config:
+            print(
+                f"Theme unchanged ({current_theme_from_config}), skipping application")
+            return
+
+        print(
+            f"Applying theme change: {self.current_applied_theme} -> {current_theme_from_config}")
+
+        # Get styles for the theme from config
+        styles = get_theme_styles(current_theme_from_config)
+
+        # Apply main widget styles
         self.setStyleSheet(styles['main_widget'])
+
+        # Control button styles are now handled in the main stylesheet with object names
+
+        # Apply styles to status label if it exists
+        if hasattr(self, 'status_label'):
+            self.status_label.setStyleSheet(
+                f"font-size: 10px; border: none; {styles['status_text']}")
+
+        # Update the current applied theme
+        self.current_applied_theme = current_theme_from_config
+
+        # Force update
+        self.update()
+        self.repaint()
+
+        print(f"Theme applied successfully: {current_theme_from_config}")
 
     def load_configuration(self):
         """Load Canvas configuration"""
@@ -966,7 +1395,17 @@ class CanvasGradeWidget(QWidget):
         )
 
         self.setGeometry(100, 100, 350, 500)
-        self.setWindowOpacity(0.95)
+        self.setWindowOpacity(0.96)
+
+        # Add drop shadow effect
+        from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        from PySide6.QtGui import QColor
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setXOffset(3)
+        shadow.setYOffset(3)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        self.setGraphicsEffect(shadow)
 
         # Theme will be applied by apply_theme() method
 
@@ -984,27 +1423,32 @@ class CanvasGradeWidget(QWidget):
 
         # Settings button
         self.settings_button = QPushButton("⚙")
-        self.settings_button.setFixedSize(25, 25)
+        self.settings_button.setObjectName("settingsButton")
+        self.settings_button.setFixedSize(28, 28)
         self.settings_button.clicked.connect(self.show_settings_dialog)
         self.settings_button.setToolTip("Canvas Settings")
 
         # Refresh button
         self.refresh_button = QPushButton("🔄")
-        self.refresh_button.setFixedSize(25, 25)
+        self.refresh_button.setObjectName("refreshButton")
+        self.refresh_button.setFixedSize(28, 28)
         self.refresh_button.clicked.connect(self.refresh_data)
         self.refresh_button.setToolTip("Refresh grades")
 
         # Close button
-        close_button = QPushButton("×")
-        close_button.setFixedSize(25, 25)
-        close_button.clicked.connect(self.close)
-        close_button.setStyleSheet(styles['close_button'])
+        self.close_button = QPushButton("×")
+        self.close_button.setObjectName("closeButton")
+        self.close_button.setFixedSize(28, 28)
+        self.close_button.clicked.connect(self.close)
 
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         header_layout.addWidget(self.settings_button)
         header_layout.addWidget(self.refresh_button)
-        header_layout.addWidget(close_button)
+        header_layout.addWidget(self.close_button)
+
+        # Profile widget (student name and picture)
+        self.profile_widget = ProfileWidget()
 
         # Status label
         self.status_label = QLabel("Loading courses...")
@@ -1026,6 +1470,7 @@ class CanvasGradeWidget(QWidget):
 
         # Add to main layout
         main_layout.addLayout(header_layout)
+        main_layout.addWidget(self.profile_widget)
         main_layout.addWidget(self.status_label)
         main_layout.addWidget(scroll_area)
 
@@ -1039,6 +1484,9 @@ class CanvasGradeWidget(QWidget):
 
     def refresh_data(self):
         """Refresh course data from Canvas"""
+        # Check for theme changes in config.py
+        self.check_theme_changes()
+
         if not self.canvas_url or not self.api_token:
             self.status_label.setText("Configuration missing")
             return
@@ -1049,6 +1497,7 @@ class CanvasGradeWidget(QWidget):
         # Start API worker thread with current configuration
         self.api_worker = CanvasAPIWorker(self.canvas_url, self.api_token)
         self.api_worker.courses_fetched.connect(self.on_courses_fetched)
+        self.api_worker.profile_fetched.connect(self.on_profile_fetched)
         self.api_worker.error_occurred.connect(self.on_error)
         self.api_worker.start()
 
@@ -1058,6 +1507,15 @@ class CanvasGradeWidget(QWidget):
         self.display_courses()
         self.status_label.setText(f"Last updated: {self.get_current_time()}")
         self.refresh_button.setEnabled(True)
+
+    def on_profile_fetched(self, profile_data):
+        """Handle successful profile fetch"""
+        if self.profile_widget and profile_data:
+            self.profile_widget.update_profile(profile_data)
+            print(f"Profile updated: {profile_data.get('name', 'Unknown')}")
+            print(
+                f"ProfileWidget after update - size: {self.profile_widget.size()}, visible: {self.profile_widget.isVisible()}")
+            print(f"ProfileWidget geometry: {self.profile_widget.geometry()}")
 
     def on_error(self, error_message):
         """Handle API error"""
@@ -1085,18 +1543,72 @@ class CanvasGradeWidget(QWidget):
         from datetime import datetime
         return datetime.now().strftime("%H:%M")
 
+    def check_theme_changes(self):
+        """Check if theme has changed in config.py and apply if needed"""
+        try:
+            current_config_theme = load_theme_config()
+            print(
+                f"Theme check: config={current_config_theme}, applied={self.current_applied_theme}")
+
+            if current_config_theme != self.current_applied_theme:
+                print(
+                    f"Theme changed detected: {self.current_applied_theme} -> {current_config_theme}")
+                self.apply_theme()
+                # Also refresh course widgets with new theme
+                self.display_courses()
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(
+                        f"Theme auto-updated to {current_config_theme}! Last updated: {self.get_current_time()}")
+        except Exception as e:
+            print(f"Error checking theme changes: {e}")
+
     def closeEvent(self, event):
         """Handle application close event"""
+        print("Application closing - cleaning up resources...")
+
+        # Stop refresh timer if it exists
+        if hasattr(self, 'refresh_timer'):
+            self.refresh_timer.stop()
+            print("Refresh timer stopped")
+
         # Stop and wait for API worker thread to finish
         if hasattr(self, 'api_worker') and self.api_worker.isRunning():
+            print("Stopping API worker thread...")
             self.api_worker.stop()  # Request graceful stop
             self.api_worker.quit()
             # Wait up to 3 seconds for thread to finish
             self.api_worker.wait(3000)
             if self.api_worker.isRunning():
+                print("Force terminating API worker thread...")
                 self.api_worker.terminate()  # Force terminate if still running
+            else:
+                print("API worker thread stopped gracefully")
 
+        # Stop any running QTimers
+        for child in self.findChildren(QTimer):
+            if child.isActive():
+                child.stop()
+                print(f"Stopped timer: {child}")
+
+        # Clear any dialog references
+        if hasattr(self, 'setup_dialog'):
+            self.setup_dialog = None
+        if hasattr(self, 'settings_dialog'):
+            self.settings_dialog = None
+
+        print("Resource cleanup completed")
         event.accept()
+
+        # Force application exit to prevent background processes
+        app = QApplication.instance()
+        if app:
+            print("Calling QApplication.quit()")
+            app.quit()
+
+        # Additional cleanup to ensure complete exit
+        import sys
+        print("Calling sys.exit()")
+        sys.exit(0)
 
     def mousePressEvent(self, event):
         """Handle mouse press for dragging"""
