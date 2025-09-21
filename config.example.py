@@ -3,6 +3,7 @@
 
 CANVAS_BASE_URL = "https://iit.instructure.com"
 API_TOKEN = "your_api_token_here"
+THEME="nord"
 
 # To get your API token:
 # 1. Log into Canvas
